@@ -3,6 +3,7 @@ import Koa from 'koa';
 import Router from '@koa/router';
 import bodyParser from 'koa-bodyparser';
 import { login, requireAuth } from './auth.js';
+import { analyze } from './analyze.js';
 
 const app = new Koa();
 const router = new Router();
@@ -13,6 +14,7 @@ router.post('/login', bodyParser({ enableTypes: ['json', 'form'] }), login);
 router.get('/analyze', requireAuth, (ctx) => {
   ctx.body = 'ok';
 });
+router.post('/analyze', requireAuth, analyze);
 
 app.use(router.routes());
 app.use(router.allowedMethods());

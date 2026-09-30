@@ -5,6 +5,7 @@
     "moduleResolution": "NodeNext",
     "verbatimModuleSyntax": true,
     "strict": true,
+    "resolveJsonModule": true,
     "outDir": "./dist",
     "rootDir": "./src"
   },
