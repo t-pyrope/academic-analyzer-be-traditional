@@ -46,3 +46,66 @@ for AI analysis. Keep both copies synchronized manually when changing the experi
 
 All modules in `src/pdf` are copied from the serverless app’s `lib/pdf`; only
 TypeScript type imports and module paths are adapted for Node ESM.
+
+## Deploy and test on Render
+
+1. Push this repository to your Git provider. In Render choose **New → Blueprint**,
+   connect the repository and use `render.yaml`. It defines a free Node web service,
+   `npm ci --include=dev && npm run build`, `npm start`, and `/health`.
+2. Enter `OPENAI_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
+   and `APP_PASSWORD_HASH` (the bcrypt hash, not the password). Render generates
+   `SESSION_SECRET`. Do not upload `.env` or put secrets in the Blueprint.
+3. Set `ALLOWED_ORIGINS` to the exact FE origin, e.g. `https://your-fe.vercel.app`,
+   without a trailing slash. Multiple origins can be comma-separated; local FE
+   origins must be explicitly listed too. The Blueprint uses `COOKIE_SAME_SITE=none`
+   for cross-site requests. Use `lax` if FE and BE are on the same site.
+4. Deploy and open `https://<service>.onrender.com/health`; expect `{"status":"ok"}`.
+   Startup rejects missing configuration. Health checks do not call OpenAI/Redis
+   and do not verify API credentials, model access, or available provider credits.
+5. Log in **on this backend** with `POST /login`, then send PDFs to `POST /analyze`.
+   An existing FE-domain cookie is not sent to the Render domain. Browser requests
+   to both endpoints must use `credentials: 'include'`:
+
+   ```js
+   const api = 'https://<service>.onrender.com';
+   await fetch(`${api}/login`, {
+     method: 'POST', credentials: 'include',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({ password }),
+   });
+   const form = new FormData();
+   form.set('rules', selectedProfileId);
+   form.set('assignment', assignment ?? '');
+   for (const file of files) form.append('documents', file);
+   const response = await fetch(`${api}/analyze`, {
+     method: 'POST', credentials: 'include', body: form,
+   });
+   // Do not manually set Content-Type for FormData; the browser adds the boundary.
+   const result = await response.json();
+   ```
+
+`TRUST_PROXY=true` lets Koa recognize Render's forwarded HTTPS and client IP;
+keep it disabled when the app is directly exposed without a trusted proxy. Render
+handles TLS, and the server binds to `0.0.0.0:$PORT`. Cookies remain Secure/HttpOnly.
+Some browsers block third-party cookies even with SameSite=None. For browser
+experiments use FE/BE subdomains of the same custom domain when this occurs;
+otherwise test with a cookie-capable HTTP client. A FE proxy changes the measured
+network path, so document it if used. Frontend code is not modified in this repo.
+
+For performance comparisons, record region, instance size, Node/package versions,
+and distinguish cold and warm runs. Free Render instances sleep after 15 minutes
+of inactivity; their first request can take about a minute to wake up. Use a paid
+instance for consistent warm-server measurements. Start with one small PDF and
+one request at a time: PDF parsing and uploads buffer data in memory. A 50 MiB
+request limit does not bound total parser memory. Long in-flight analyses can be
+interrupted by a deploy; do not deploy during a measurement run.
+
+The application log byte counters estimate OpenAI payloads only; they exclude
+transport overhead/retries, browser-to-BE traffic, and Redis traffic. Measure those
+separately when comparing total network usage. If both apps share one Upstash DB,
+their `analyze:<ip>` rate-limit keys can interact. Use separate databases (same region)
+or run batches far enough apart to avoid affecting the comparison.
+
+References: [Render web services](https://render.com/docs/web-services),
+[health checks](https://render.com/docs/health-checks),
+[free instance limits](https://render.com/docs/free).

@@ -1,3 +1,4 @@
+import { isAllowedOrigin } from './http.js';
 import { compare } from 'bcryptjs';
 import type { Middleware } from 'koa';
 import {
@@ -21,7 +22,7 @@ export const requireAuth: Middleware = async (ctx, next) => {
 export const login: Middleware = async (ctx) => {
   ctx.set('Cache-Control', 'no-store');
   const origin = ctx.get('Origin');
-  if (origin && origin !== ctx.origin) {
+  if (origin && !isAllowedOrigin(origin, ctx.origin)) {
     ctx.status = 403;
     ctx.body = 'Forbidden';
     return;
@@ -51,6 +52,7 @@ export const login: Middleware = async (ctx) => {
 
   ctx.cookies.set(SESSION_COOKIE, createSession(), {
     ...sessionCookieOptions,
+    sameSite: process.env.COOKIE_SAME_SITE === 'none' ? 'none' : 'lax',
     maxAge: SESSION_DURATION * 1000,
   });
   ctx.status = 204;
