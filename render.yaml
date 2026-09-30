@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: academic-analyzer-be-traditional
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: APP_PASSWORD_HASH
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: COOKIE_SAME_SITE
+        value: none
